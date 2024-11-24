@@ -1,10 +1,9 @@
-import urllib.request
 import re
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 
-from LLM.handleText.GPTDatasetV1 import GPTDatasetV1
-from LLM.handleText.SimpleTokenizerV1 import SimpleTokenizerV1
-from LLM.handleText.SimpleTokenizerV2 import SimpleTokenizerV2
+from LLM.chapter1.handleText.GPTDatasetV1 import GPTDatasetV1
+from LLM.chapter1.handleText.SimpleTokenizerV1 import SimpleTokenizerV1
+from LLM.chapter1.handleText.SimpleTokenizerV2 import SimpleTokenizerV2
 
 # download the text file
 # url = ("https://raw.githubusercontent.com/rasbt/"
