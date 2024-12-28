@@ -34,8 +34,15 @@ print("Sum:", attn_weight_2.sum())
 query = inputs[1]
 context_vec_2 = torch.zeros(query.shape)
 for i,x_i in enumerate(inputs):
-    print(attn_scores_2[i], x_i)
-    print(attn_weight_2[i] * x_i)
+    # print(attn_scores_2[i], x_i)
+    # print(attn_weight_2[i] * x_i)
     context_vec_2 += attn_weight_2[i] * x_i
-    print(context_vec_2)
+    # print(context_vec_2)
 print(context_vec_2)
+
+
+attn_scores = torch.empty(6, 6)
+for i, x_i in enumerate(inputs):
+    for j, x_j in enumerate(inputs):
+        attn_scores[i, j] = torch.dot(x_i, x_j)
+print(attn_scores)
