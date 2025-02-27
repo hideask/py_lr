@@ -1,0 +1,6 @@
+### IntelliJ IDEA ###
+.idea
+
+/course01/.pytest_cache
+/course01/__pycache__
+
