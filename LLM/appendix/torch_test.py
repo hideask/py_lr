@@ -211,3 +211,8 @@ def compute_accuracy(model, dataloader):
 
 print(compute_accuracy(model, train_loader))
 print(compute_accuracy(model, test_loader))
+
+torch.save(model.state_dict(), "model.pth")
+
+model = NeuralNetwork(num_inputs=2, num_outputs=2)
+model.load_state_dict(torch.load("model.pth"))
