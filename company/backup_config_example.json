@@ -1,0 +1,13 @@
+[
+    {
+        "table_name": "zhilian_job",
+        "fields": ["id", "job_name", "company_name", "salary"]
+    },
+    {
+        "table_name": "zhilian_resume"
+    },
+    {
+        "table_name": "user_info",
+        "fields": ["id", "username", "email", "create_time"]
+    }
+]

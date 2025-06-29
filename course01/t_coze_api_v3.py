@@ -1,30 +1,30 @@
+# -*- coding: utf-8-sig -*-
+
 import requests
 import json
 
 from twisted.python.util import println
 
-
+query = {"user": {"name": "曾先生", "genderLabel": "男", "email": "", "age": 21, "ageLabel": "21岁", "maxEducationLabel": "大专", "workYears": 0, "workYearsLabel": "无经验", "cityLabel": "现居北京 东城区", "phone": "156****2612"}, "resume": {"skillTags": [], "educationExperiences": [{"schoolName": "成都航空职业技术学院", "beginTime": 1661961600000, "endTime": 1751299200000, "educationTimeLabel": "2022.09 - 2025.07", "major": "电气自动化技术", "educationLabel": "大专"}], "workExperiences": [], "projectExperiences": [], "languageSkills": [], "certificates": [], "purposes": [{"industryLabel": "不限行业", "jobTypeLabel": "商品销售", "jobNatureLabel": "全职", "location": "成都", "salaryLabel": "6千-1.1万/月"}, {"industryLabel": "电子商务、人工智能、新媒体", "jobTypeLabel": "人力资源专员/助理", "jobNatureLabel": "兼职、全职、实习", "location": "成都", "salaryLabel": "5千-8千/月"}, {"industryLabel": "快速消费品", "jobTypeLabel": "行政专员/助理", "jobNatureLabel": "兼职、全职、实习", "location": "成都", "salaryLabel": "8千-1万/月"}]}}
 def chat_query():
     url = 'https://api.coze.cn/v3/chat'
     headers = {
         "Content-Type": "application/json",
-        "Authorization" : "Bearer pat_M6dOiyngbNi4JSkctY4PUlgkWoz2961UIL4tq2FttNULLiod3xhqvTz9oqPl1Zap",
+        "Authorization" : "Bearer pat_wkSk1NRVFOl7CMVxGTht2QBQiDWOnGGWPObkg56nQnMoPTnUEuYrmmkEgKfsZf6r",
     }
     data = {
-
-        "bot_id": "7399609039661056038",
-        "user_id": "29032201862555",
-        "query": "工伤认定",
+        "bot_id": "7512823884287475712",
+        "user_id": "788899678976",
+        # "query": json.dumps(query),
         "stream": True,
-        "auto_save_history": True,
+        "auto_save_history": False,
         "additional_messages" : [
             {
                 "role": "user",
-                "content": "工伤认定",
+                "content": json.dumps(query),
                 "content_type": "text"
             }
         ]
-        #{"additional_messages":[{"role":"user","content_type":"text","content":"1加上8等于多少呢"}],"user_id":"29032201862555","stream":true,"bot_id":"7399609039661056038","auto_save_history":true}
     }
 
     response = requests.post(url, headers=headers, json=data, stream=True)
