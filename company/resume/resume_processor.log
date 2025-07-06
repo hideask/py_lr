@@ -1,0 +1,32 @@
+2025-07-04 17:35:14,980 - ResumeProcessor - INFO - 简历处理器初始化完成
+2025-07-04 17:35:14,981 - ResumeProcessor - INFO - 配置: 20线程, 100批次大小
+2025-07-04 17:35:15,168 - ResumeProcessor - INFO - 开始处理简历数据
+2025-07-04 17:35:15,168 - ResumeProcessor - INFO - 正在获取简历数据...
+2025-07-04 17:35:28,095 - ResumeProcessor - INFO - 执行查询: SELECT id, resume_processed_info FROM zhilian_resume WHERE train_type = %s limit 1
+2025-07-04 17:35:30,089 - ResumeProcessor - INFO - 查询到 1 条记录
+2025-07-04 17:35:35,181 - ResumeProcessor - INFO - 共获取到 1 条记录
+2025-07-04 17:35:46,448 - ResumeProcessor - INFO - 分为 1 个批次处理
+2025-07-04 17:36:41,200 - ResumeProcessor - INFO - 批次 1/1 完成 (总进度: 1/1)
+2025-07-04 17:36:41,200 - ResumeProcessor - INFO - 处理完成!
+2025-07-04 17:36:41,201 - ResumeProcessor - INFO - 总记录数: 1
+2025-07-04 17:36:41,201 - ResumeProcessor - INFO - 成功处理: 1
+2025-07-04 17:36:41,201 - ResumeProcessor - INFO - 处理失败: 0
+2025-07-04 17:36:41,201 - ResumeProcessor - INFO - 成功率: 100.00%
+2025-07-04 17:36:41,201 - ResumeProcessor - INFO - 总耗时: 86.03秒
+2025-07-04 17:36:41,202 - ResumeProcessor - INFO - 处理速度: 0.01记录/秒
+2025-07-04 17:36:50,388 - ResumeProcessor - INFO - 简历处理器初始化完成
+2025-07-04 17:36:50,388 - ResumeProcessor - INFO - 配置: 20线程, 100批次大小
+2025-07-04 17:36:50,587 - ResumeProcessor - INFO - 开始处理简历数据
+2025-07-04 17:36:50,587 - ResumeProcessor - INFO - 正在获取简历数据...
+2025-07-04 17:36:54,347 - ResumeProcessor - INFO - 执行查询: SELECT id, resume_processed_info FROM zhilian_resume WHERE train_type = %s limit 1
+2025-07-04 17:36:55,991 - ResumeProcessor - INFO - 查询到 1 条记录
+2025-07-04 17:37:00,392 - ResumeProcessor - INFO - 共获取到 1 条记录
+2025-07-04 17:37:04,540 - ResumeProcessor - INFO - 分为 1 个批次处理
+2025-07-04 17:37:37,550 - ResumeProcessor - INFO - 批次 1/1 完成 (总进度: 1/1)
+2025-07-04 17:37:37,551 - ResumeProcessor - INFO - 处理完成!
+2025-07-04 17:37:37,551 - ResumeProcessor - INFO - 总记录数: 1
+2025-07-04 17:37:37,551 - ResumeProcessor - INFO - 成功处理: 1
+2025-07-04 17:37:37,551 - ResumeProcessor - INFO - 处理失败: 0
+2025-07-04 17:37:37,551 - ResumeProcessor - INFO - 成功率: 100.00%
+2025-07-04 17:37:37,552 - ResumeProcessor - INFO - 总耗时: 46.96秒
+2025-07-04 17:37:37,552 - ResumeProcessor - INFO - 处理速度: 0.02记录/秒

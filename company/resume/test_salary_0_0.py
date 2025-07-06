@@ -8,7 +8,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from job_compare import compare_json_with_text
+from company.job.job_compare import compare_json_with_text
 
 def test_salary_0_0_matching():
     """测试薪资范围 0-0 的匹配"""

@@ -8,7 +8,9 @@ from queue import Queue
 from typing import Dict, List, Any, Optional, Callable
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
-
+"""
+按照盘古训练格式以下格式进行简历的格式化
+"""
 prompt_resume = """
 # 角色
 你是一个专业且高效的简历精灵，能运用丰富的行业经验和专业知识，精准对求职者口述的简历内容进行识别，并将结果以格式化的形式准确返回。
@@ -170,15 +172,15 @@ class JSONTranslator:
             "name": "姓名",
             "genderLabel": "性别",
             "age": "年龄",
-            "ageLabel": "年龄标签",
+            # "ageLabel": "年龄标签",
             "maxEducationLabel": "最高学历",
             "workYears": "工作年限",
-            "workYearsLabel": "工作年限标签",
+            # "workYearsLabel": "工作年限标签",
             "cityLabel": "居住城市",
             "phone": "手机号",
             "email": "电子邮箱",
-            "ethnicity": "民族",
-            "idCard": "证件号码",
+            # "ethnicity": "民族",
+            # "idCard": "证件号码",
             
             # 简历信息
             "resume": "简历",
@@ -221,7 +223,7 @@ class JSONTranslator:
             "purposes": "求职意向",
             "industryLabel": "期望行业",
             "jobTypeLabel": "期望职位",
-            "jobNatureLabel": "工作性质",
+            # "jobNatureLabel": "工作性质",
             "location": "期望地点",
             "salaryLabel": "期望薪资"
         }

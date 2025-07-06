@@ -5,7 +5,7 @@
 """
 
 import logging
-from refactored_processors import (
+from company.job.refactored_processors import (
     JobProcessor, 
     ResumeProcessor, 
     DataSyncProcessor, 

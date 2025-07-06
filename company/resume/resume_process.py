@@ -15,20 +15,20 @@ retain_fields = {
             "name": True,
             "genderLabel": True,
             "age": True,
-            "ageLabel": True,
+            # "ageLabel": True,
             "maxEducationLabel": True,
             "workYears": True,
-            "workYearsLabel": True,
+            # "workYearsLabel": True,
             "cityLabel": True,
             "unlockedPhone": True,
             "email": True
         },
         "resume": {
-            "skillTags": True,
+            # "skillTags": True,
             "educationExperiences": {
                 "schoolName": True,
-                "beginTime": True,
-                "endTime": True,
+                # "beginTime": True,
+                # "endTime": True,
                 "educationTimeLabel": True,
                 "major": True,
                 "educationLabel": True
@@ -38,17 +38,17 @@ retain_fields = {
                 "jobTitle": True,
                 "description": True,
                 "timeLabel": True,
-                "workSkillTags": {
-                    "name": True
-                }
+                # "workSkillTags": {
+                #     "name": True
+                # }
             },
             "projectExperiences": {
                 "name": True,
-                "beginTime": True,
-                "endTime": True,
+                # "beginTime": True,
+                # "endTime": True,
                 "timeLabel": True,
                 "description": True,
-                "responsibility": True,
+                # "responsibility": True,
             },
             # "professionalSkills": {
             #     "name": True,
@@ -127,50 +127,50 @@ field_mapping = {
 }
 
 
-def filter_resume_data(input_data, required_fields):
-    def filter_dict(data, fields, parent_key=""):
-        if not isinstance(data, dict):
-            return data
+# def filter_resume_data(input_data, required_fields):
+#     def filter_dict(data, fields, parent_key=""):
+#         if not isinstance(data, dict):
+#             return data
 
-        result = {}
-        for key, value in data.items():
-            if key in fields:
-                value = deep_clean(value)
+#         result = {}
+#         for key, value in data.items():
+#             if key in fields:
+#                 value = deep_clean(value)
 
-                # 自定义字段映射 + 上下文重命名
-                current_key = field_mapping.get(key, key)
+#                 # 自定义字段映射 + 上下文重命名
+#                 current_key = field_mapping.get(key, key)
 
-                # 特殊字段重命名规则（根据 parent_key 判断上下文）
-                if parent_key == "skillTags" and key == "name":
-                    current_key = "技能名称"
-                elif parent_key == "certificates" and key == "name":
-                    current_key = "证书名称"
-                elif parent_key == "workSkillTags" and key == "name":
-                    current_key = "工作技能名称"
-                elif parent_key == "languageSkills" and key == "name":
-                    current_key = "语言名称"
-                elif key == "unlockedPhone":
-                    current_key = "手机号码"
-                elif key == "educationExperiences":
-                    current_key = "教育经历"
-                elif key == "workExperiences":
-                    current_key = "工作经历"
-                elif key == "projectExperiences":
-                    current_key = "项目经验"
+#                 # 特殊字段重命名规则（根据 parent_key 判断上下文）
+#                 if parent_key == "skillTags" and key == "name":
+#                     current_key = "技能名称"
+#                 elif parent_key == "certificates" and key == "name":
+#                     current_key = "证书名称"
+#                 elif parent_key == "workSkillTags" and key == "name":
+#                     current_key = "工作技能名称"
+#                 elif parent_key == "languageSkills" and key == "name":
+#                     current_key = "语言名称"
+#                 elif key == "unlockedPhone":
+#                     current_key = "手机号码"
+#                 elif key == "educationExperiences":
+#                     current_key = "教育经历"
+#                 elif key == "workExperiences":
+#                     current_key = "工作经历"
+#                 elif key == "projectExperiences":
+#                     current_key = "项目经验"
 
-                # 递归处理值
-                if isinstance(value, dict):
-                    result[current_key] = filter_dict(value, fields.get(key, {}), parent_key=key)
-                elif isinstance(value, list):
-                    result[current_key] = [
-                        filter_dict(item, fields.get(key, {}), parent_key=key) if isinstance(item, dict) else item
-                        for item in value
-                    ]
-                else:
-                    result[current_key] = value
-        return result
+#                 # 递归处理值
+#                 if isinstance(value, dict):
+#                     result[current_key] = filter_dict(value, fields.get(key, {}), parent_key=key)
+#                 elif isinstance(value, list):
+#                     result[current_key] = [
+#                         filter_dict(item, fields.get(key, {}), parent_key=key) if isinstance(item, dict) else item
+#                         for item in value
+#                     ]
+#                 else:
+#                     result[current_key] = value
+#         return result
 
-    return filter_dict(input_data, required_fields, parent_key="")
+#     return filter_dict(input_data, required_fields, parent_key="")
 
 
 def filter_resume_data(input_data, required_fields):
@@ -376,7 +376,8 @@ def process_resumes_multithreaded(num_threads=7):
 
     try:
         cursor = connection.cursor()
-        cursor.execute("SELECT id, resume_info FROM zhilian_resume WHERE resume_processed_info IS NULL and resume_info is not NULL LIMIT 35000")
+        # cursor.execute("SELECT id, resume_info FROM zhilian_resume WHERE resume_processed_info IS NULL and resume_info is not NULL LIMIT 35000")
+        cursor.execute("SELECT id, resume_info FROM zhilian_resume WHERE  resume_info is not NULL and work_years is not null LIMIT 35000")
         all_data = cursor.fetchall()
         print(f"获取成功{len(all_data)}条数据")
 
@@ -745,12 +746,12 @@ def process_resume_job(max_workers=10):
 
 if __name__ == "__main__":
     # process_resumes()
-    # process_resumes_multithreaded()
+    process_resumes_multithreaded()
     # process_resumes_excel()
     # insert_resume_description()
     # process_resume_sc()
     # process_resumes_sc_excel()
-    process_resume_job()
+    # process_resume_job()
 
 
     # data = pd.read_excel("https://p3-bot-workflow-sign.byteimg.com/tos-cn-i-mdko3gqilj/fba2b49cda4944a4bdf8fefdf4bd5f5f.xlsx~tplv-mdko3gqilj-image.image?rk3s=81d4c505&x-expires=1780137943&x-signature=429UE6ODXXvvznI48HsBR3j1Qq4%3D&x-wf-file_name=resume_data_1.xlsx")

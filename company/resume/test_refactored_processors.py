@@ -7,18 +7,16 @@
 import unittest
 import json
 import logging
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from common_db_processor import (
     BaseQueryProcessor, 
     JSONProcessor, 
     HTMLCleanProcessor, 
     CommonQueryBuilder
 )
-from refactored_processors import (
+from company.job.refactored_processors import (
     JobProcessor, 
-    ResumeProcessor, 
-    DataSyncProcessor, 
-    CompareProcessor
+    ResumeProcessor
 )
 from db_connection import DatabaseConnection
 

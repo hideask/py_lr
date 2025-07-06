@@ -1,4 +1,7 @@
+import re
+import psycopg2
 from datetime import datetime
+from db_connection import get_db_connection, close_db_connection
 
 import pandas as pd
 from openpyxl import Workbook
@@ -9,63 +12,288 @@ import json
 import threading
 import logging
 import time
-
-import logging
 import random
 
-import psycopg2
-from db_connection import get_db_connection, close_db_connection
+import logging
 
-# 创建 logger 对象
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)  # 设置日志级别
+logging.basicConfig(level=logging.INFO)
 
-# 创建一个用于写入文件的 handler
-file_handler = logging.FileHandler('app.log')
-file_handler.setLevel(logging.INFO)
-file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(file_formatter)
-
-# 创建一个用于输出到控制台的 handler
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-console_formatter = logging.Formatter('%(levelname)s - %(message)s')
-console_handler.setFormatter(console_formatter)
-
-# 将两个 handler 添加到 logger 中
-logger.addHandler(file_handler)
-logger.addHandler(console_handler)
-
-
-counter = 0
-
-
-# 结果表中创建新的列
-# df = pd.read_excel('C:/Users/liujie/Desktop/resume_data_json_0_5000.xlsx')
-# df = pd.read_excel('D:/数字政务/人岗匹配/一句话简历数据/原始数据/resume_data_json_5000_15000.xlsx')
-# print(f"读取数据成功，共有{df.shape[0]}条数据")
-# column_names = df.columns.tolist()
-# column_names.extend(['序号','introduce', 'threadName', '耗时(秒)'])
-#
-# new_wb = Workbook()
-# ws = new_wb.active
-# ws.append(column_names)
-# for cell in ws[1]:  # 工作表的第一行
-#     cell.font = Font(bold=True)  # 设置字体为加粗
+retain_fields = {
+    "companyName": "",
+    "cityDistrict": "",
+    "education": "",
+    "jobSummary": "",
+    "name": "",
+    "recruitNumber": True,
+    "salaryReal": "",
+    "welfareTagList": [],
+    "workType": "",
+    "workingExp": ""
+    # "companySize": "",
+    # "displayPhoneNumber": False,
+    # "industryName": "",
+    # "cardCustomJson": "",
+    # "needMajor": [],
+    # "staffCard": {
+    #     "staffName": ""
+    # },
+    # "salary60": "",
+    # "salaryCount": "",
+    # "subJobTypeLevelName": "",
+    # "workCity": "",
+    # "streetName": "",
+}
 
 
+import html
 
-# 读取Excel文件
-def read_excel():
-    global df
-    # 每100行进行切片
-    slice_size = 482
-    slices = [df.iloc[i:i + slice_size] for i in range(0, df.shape[0], slice_size)]
-    print(f"处理{len(slices)}个块")
-    return slices
+def clean_html(text):
+    if not text:
+        return ""
 
-check_file_exists = True
-# 处理每个块的函数
+    # 第一步：自动解码 HTML 实体（如 &lt; → <, &#xa; → \n, &#xff01; → ！）
+    text = html.unescape(text)
+
+    # 第二步：去除所有 HTML 标签
+    text = re.sub(r"<[^>]+>", "", text)
+
+    text = re.sub(r"&\s*lt\s*;?", "<", text)
+    text = re.sub(r"&\s*gt\s*;?", ">", text)
+    text = re.sub(r"&\s*#xa\s*;?", "\n", text)
+    text = re.sub(r"&\s*#xd\s*;?", "\r", text)
+    text = re.sub(r"&\s*#x9\s*;?", " ", text)
+
+    # 第三步：替换特殊空白字符（零宽空格、软换行等）
+    text = re.sub(r"[\xa0\u200b\u200c\u200d\u200e\u200f]", " ", text)
+
+    # 第四步：合并连续空白为单个空格，并去除首尾空格
+    text = re.sub(r"\s+", " ", text).strip()
+
+    return text
+
+def clean_job_data():
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    cursor.execute("SELECT id, job_description FROM sc_pub_recruitmentnet_job where job_description like '%<%' or job_description like '%&%' ")
+
+    rows = cursor.fetchall()
+
+    for row in rows:
+        job_id = row[0]
+        dirty_description = row[1]
+        cleaned_description = clean_html(dirty_description)
+
+        cursor.execute(
+            "UPDATE sc_pub_recruitmentnet_job SET job_description = %s WHERE id = %s",
+            (cleaned_description, job_id)
+        )
+        connection.commit()
+        print(f"Cleaned job description for job ID: {job_id}")
+    close_db_connection(cursor, connection)
+
+
+def process_jobs():
+    """处理岗位主函数"""
+    connection = None
+    cursor = None
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor()
+
+        zhilian_job = process_job_batch(cursor, connection)
+
+        i = 0
+        for id, job_info, category_name, job_name in zhilian_job:
+            try:
+                job_data = json.loads(job_info)
+                filtered_data = filter_job_data(job_data, required_fields=retain_fields)
+                
+                # 重组JSON字段：提取cardCustomJson中的字段到最外层
+                if 'cardCustomJson' in job_data and job_data['cardCustomJson']:
+                    try:
+                        card_custom_data = json.loads(job_data['cardCustomJson'])
+                        # 提取salary60到最外层
+                        # if 'salary60' in card_custom_data:
+                        #     filtered_data['salary60'] = card_custom_data['salary60']
+                        #     del card_custom_data['salary60']
+
+                        # 提取address到最外层
+                        if 'address' in card_custom_data:
+                            filtered_data['address'] = card_custom_data['address']
+                            del card_custom_data['address']
+                        # 更新cardCustomJson，移除已提取的字段
+                        # filtered_data['cardCustomJson'] = json.dumps(card_custom_data, ensure_ascii=False)
+                    except (json.JSONDecodeError, TypeError):
+                        # 如果cardCustomJson不是有效的JSON，保持原样
+                        pass
+                
+                # 提取staffCard中的staffName到最外层
+                if 'staffCard' in filtered_data and isinstance(filtered_data['staffCard'], dict):
+                    if 'staffName' in filtered_data['staffCard']:
+                        filtered_data['staffName'] = filtered_data['staffCard']['staffName']
+                    # 移除staffCard对象
+                    del filtered_data['staffCard']
+                
+                # filtered_data['category_name'] = category_name
+                # filtered_data['job_name'] = job_name
+                filtered_data['id'] = id
+
+                # 处理salaryReal字段格式
+                if 'salaryReal' in filtered_data:
+                    filtered_data['salaryReal'] = process_salary_range(filtered_data['salaryReal'])
+                processed_info = json.dumps(filtered_data, ensure_ascii=False)
+
+                update_job_info(cursor, connection, id, processed_info)
+                i += 1
+                print(f"已更新岗位id {filtered_data['id']}, 成功更新{i}条")
+            except Exception as ex:
+                connection.rollback()
+                print(f"处理岗位id {filtered_data['id']} 时出错: {str(ex)}")
+                # print(f"错误数据: {job_info}")
+                continue
+    finally:
+        close_db_connection(cursor, connection)
+
+def process_salary_range(salary_range):
+    """处理薪资范围格式，将类似5001-10000转换为5000-10000"""
+    if not salary_range or not isinstance(salary_range, str):
+        return salary_range
+    
+    # 匹配薪资范围格式，如：5001-10000, 10001-25000
+    pattern = r'(\d+)-(\d+)'
+    match = re.match(pattern, salary_range.strip())
+    
+    if match:
+        min_salary = int(match.group(1))
+        max_salary = int(match.group(2))
+        
+        # 将最小薪资调整为千位整数
+        # 如果是x001格式，改为x000
+        if min_salary % 1000 == 1:
+            min_salary = min_salary - 1
+        
+        return f"{min_salary}-{max_salary}"
+    
+    return salary_range
+
+def process_job_batch(cursor, connection, batch_size=20000):
+    """处理一批岗位数据"""
+    cursor.execute("SELECT id, job_info, category_name, job_name FROM zhilian_job where train_type='3' LIMIT %s",
+                  (batch_size,))
+    zhilian_job = cursor.fetchall()
+    print(f"获取成功{len(zhilian_job)}条数据")
+    return zhilian_job
+
+def filter_job_data(input_data, required_fields):
+    ""
+    def filter_dict(data, fields):
+        if not isinstance(data, dict):
+            return data
+        result = {}
+        for key, value in data.items():
+            if key in fields:
+                value = deep_clean(value)
+                current_key = key
+                if isinstance(value, dict):
+                    result[current_key] = filter_dict(value, fields.get(key, {}))
+                elif isinstance(value, list):
+                    result[current_key] = [filter_dict(item, fields.get(key, {}))
+                            if isinstance(item, dict) else item for item in value
+                    ]
+                else:
+                    result[current_key] = value
+        return result
+
+    return filter_dict(input_data, required_fields)
+
+def update_job_info(cursor, connection, id, processed_info):
+    """更新岗位处理信息"""
+    update_sql = """UPDATE zhilian_job SET processed_info = %s WHERE id = %s"""
+    cursor.execute(update_sql, (processed_info, id))
+    connection.commit()
+
+def deep_clean(data):
+    if isinstance(data, str):
+        data = re.sub(r'[\u200b-\u200f\u202c-\u202e\ufeff]', '', data)
+        # 如果检测到编号列表，则用空格替换换行符，否则删除
+        # if re.search(r'\d+\.', data):  # 检测是否有编号
+        #     data = data.replace('\n', ' ')
+        # else:
+        #     data = data.replace('\n', '')
+        return data
+    elif isinstance(data, dict):
+        return {k: deep_clean(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [deep_clean(i) for i in data]
+    else:
+        return data
+
+def process_sc_jobs():
+    """处理岗位主函数"""
+    connection = None
+    cursor = None
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("SELECT id,company_name,company_type,industry,company_size,registration_address,job_category,position_name,"
+                       "job_description,work_location,required_staff_count,salary_range,benefits,experience_requirement,"
+                       "employment_type FROM sc_pub_recruitmentnet_job ")
+        zhilian_job = cursor.fetchall()
+
+        columns = [desc[0] for desc in cursor.description]
+
+        i = 0
+        for job_info in zhilian_job:
+            try:
+                row_dict = dict(zip(columns, job_info))
+                processed_info = json.dumps(row_dict, ensure_ascii=False)
+
+                update_sql = """UPDATE sc_pub_recruitmentnet_job SET processed_info = %s WHERE id = %s"""
+                cursor.execute(update_sql, (processed_info, row_dict['id']))
+                connection.commit()
+                i += 1
+                print(f"已更新岗位id {job_info[0]}, 成功更新{i}条")
+            except Exception as ex:
+                connection.rollback()
+                print(f"处理岗位id {job_info[0]} 时出错: {str(ex)}")
+                # print(f"错误数据: {job_info}")
+                continue
+    finally:
+        close_db_connection(cursor, connection)
+
+def process_job_excel():
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor()
+
+        # cursor.execute(f"select id,processed_info as info  from zhilian_job  where process_type IS null order by id")
+        cursor.execute(f"select id,processed_info as info  from sc_pub_recruitmentnet_job  where process_type IS null order by id")
+        jobs = cursor.fetchall()
+        print(f"获取成功{len(jobs)}条数据")
+        # 创建数据列表
+        excel_data = []
+
+        # 遍历数据并组装
+        for id, info in jobs:
+            info = json.loads(info)
+            info['id'] = id
+
+            row_data = {
+                'id': id,
+                'info': json.dumps(info, ensure_ascii=False)
+            }
+            excel_data.append(row_data)
+
+        df = pd.DataFrame(excel_data)
+
+        output_file = f'job_data_json_{len(jobs)}.xlsx'
+        df.to_excel(output_file, index=False)
+        print(f"数据已保存到 {output_file}")
+    finally:
+        close_db_connection(cursor, connection)
+
+check_file_exists = False
 def process_chunk(chunk, threadName, lock, output_dir):
     # global counter
 
@@ -144,12 +372,20 @@ def process_chunk(chunk, threadName, lock, output_dir):
     # thread_wb.save(thread_output_file)
 
     # return results
-
+def read_excel():
+    df = pd.read_excel('D:/数字政务/人岗匹配/一句话简历数据/原始数据/job_data_json_9134.xlsx')
+    print(f"读取数据成功，共有{df.shape[0]}条数据")
+    # 每100行进行切片
+    slice_size = 914
+    slices = [df.iloc[i:i + slice_size] for i in range(0, df.shape[0], slice_size)]
+    print(f"处理{len(slices)}个块")
+    return slices
 def format_time(timestamp):
     dt = datetime.fromtimestamp(timestamp)
     millis = int((timestamp - int(timestamp)) * 1000)
     return dt.strftime(f"%Y-%m-%d %H:%M:%S.{millis:03d}")
 
+counter = 0
 # 模拟API调用的函数
 def api_call(row, AppConversationID, lock, user_id, counter):
     # global counter
@@ -157,7 +393,7 @@ def api_call(row, AppConversationID, lock, user_id, counter):
 
     url = 'http://10.163.21.201:32300/api/proxy/api/v1/chat_query'
     data = {
-        'Apikey': 'd13tc102gkoadkll1qgg',
+        'Apikey': 'd14l347sbfv9olu4aerg',
         "Query": row['info'],
         "AppConversationID": AppConversationID,
         "ResponseMode": "blocking",
@@ -166,7 +402,7 @@ def api_call(row, AppConversationID, lock, user_id, counter):
 
     headers = {
         'Content-Type': 'application/json',
-        'Apikey': 'd13tc102gkoadkll1qgg',
+        'Apikey': 'd14l347sbfv9olu4aerg',
     }
 
     response = requests.post(url, json=data, headers=headers)
@@ -208,7 +444,7 @@ def api_call(row, AppConversationID, lock, user_id, counter):
 def getApplicationId(user_id):
     url = 'http://10.163.21.201:32300/api/proxy/api/v1/create_conversation'
     data1 = {
-        'Apikey': 'd13tc102gkoadkll1qgg',
+        'Apikey': 'd14l347sbfv9olu4aerg',
         "Inputs": {
             "var": "variable"
         },
@@ -217,7 +453,7 @@ def getApplicationId(user_id):
 
     headers = {
         'Content-Type': 'application/json',
-        'Apikey': 'd13tc102gkoadkll1qgg'
+        'Apikey': 'd14l347sbfv9olu4aerg'
     }
 
     response1 = requests.post(url, json=data1, headers=headers)
@@ -229,11 +465,7 @@ def getApplicationId(user_id):
         print('Failed to post data:', response1.status_code)
     return AppConversationID
 
-
-# 主函数
-def main(output_dir):
-    global new_wb
-
+def job_main(output_dir):
     # 确保输出目录存在
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -266,10 +498,9 @@ def fetch_unprocessed_data_from_db(batch_size=100):
     try:
         # 查询未处理的数据并标记为正在处理
         cursor.execute("""
-            SELECT id, resume_processed_info as info FROM zhilian_resume 
-            WHERE resume_description_detail IS NULL 
+            SELECT id, processed_info as info FROM zhilian_job 
+            WHERE job_description_detail IS NULL 
             and process_type is null
-            and length(resume_processed_info) > 5000 and length(resume_processed_info) <= 15000 and id != '25048' 
             ORDER BY id LIMIT %s FOR UPDATE SKIP LOCKED
         """, (batch_size,))
 
@@ -279,7 +510,7 @@ def fetch_unprocessed_data_from_db(batch_size=100):
             ids = [row[0] for row in rows]
             # 标记这些数据为正在处理
             cursor.execute("""
-                UPDATE zhilian_resume SET process_type = %s 
+                UPDATE zhilian_job SET process_type = %s 
                 WHERE id = ANY(%s)
             """, (threading.current_thread().name,ids,))
             connection.commit()
@@ -300,8 +531,8 @@ def update_result_in_db(id, result):
     try:
         introduce, start_time, end_time, elapsed_time = result[1], result[5], result[6], result[7]
         cursor.execute("""
-            UPDATE zhilian_resume SET 
-                resume_description_detail = %s,
+            UPDATE zhilian_job SET 
+                job_description_detail = %s,
                 process_start_time = %s,
                 process_end_time = %s,
                 time_consume = %s,
@@ -325,7 +556,7 @@ def worker_thread(lock, batch_size=100):
         logging.info(f"线程:{threading.current_thread().name}正在处理 {len(rows)} 条数据...")
         for row in rows:
             id = row[0]  # 第一个字段是 id
-            info = row[1]  # 第二个字段是 resume_processed_info
+            info = row[1]  # 第二个字段是 processed_info
             call_data = {'id': id, 'info': info}
             try:
                 user_id = threading.current_thread().name + str(random.randint(1_000_000, 9_999_999))
@@ -376,62 +607,8 @@ def start_with_restarting_pool(num_threads=20, max_retries=5, batch_size=10):
             except Exception as e:
                 logging.error(f"任务执行失败: {e}")
 
-def get_excel_files(folder_path):
-    excel_files = []
-    for root, dirs, files in os.walk(folder_path):
-        for file in files:
-            if file.endswith(".xlsx") or file.endswith(".xls"):
-                excel_files.append(os.path.join(root, file))
-    return excel_files
-
-# 处理单个Excel文件并更新数据
-def process_excel_file(file_path):
-    connection = get_db_connection()
-    cursor = connection.cursor()
-    try:
-        df = pd.read_excel(file_path)
-        # 假设有一个'id'字段用于匹配和更新
-        for index, row in df.iterrows():
-            # 这里可以根据你的需求进行数据库更新或其他操作
-            cursor.execute("update zhilian_resume set resume_description_detail = %s, process_start_time = %s,"
-                           "process_end_time = %s,time_consume = %s, process_type = %s where id = %s",
-                           (row['introduce'], time_to_timestamp(row['startTime_format'],  date_str='2025-06-10'), time_to_timestamp(row['endTime_format'], date_str='2025-06-10'), row['耗时(秒)'], '1', row['id']))
-            connection.commit()
-            print(f"更新数据成功, id: {row['id']}")
-    except Exception as e:
-        print(f"Error processing file {file_path}: {e}")
-    finally:
-        close_db_connection(cursor, connection)
-
-
-def time_to_timestamp(time_str, date_str=None):
-    if date_str is None:
-        date_part = datetime.today().date()
-    else:
-        date_part = datetime.strptime(date_str, "%Y-%m-%d").date()
-
-    # 分离时间和毫秒
-    time_parts = time_str.split('.')
-    main_time = time_parts[0]
-    millis = int(time_parts[1]) if len(time_parts) > 1 else 0
-
-    # 合并日期和时间
-    datetime_str = f"{date_part} {main_time}"
-    datetime_obj = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M:%S")
-
-    # 添加毫秒
-    datetime_obj_with_ms = datetime_obj.replace(microsecond=millis * 1000)
-
-    # 返回 PostgreSQL 支持的时间字符串格式
-    return datetime_obj_with_ms.strftime("%Y-%m-%d %H:%M:%S.%f")
-
-# 线程任务：每个线程处理两个文件
-def thread_task(files):
-    for file in files:
-        process_excel_file(file)
-
-def update_resume_main():
-    file_path = 'D:/数字政务/人岗匹配/一句话简历数据/处理数据/线程文件/0-5000'
+def update_job_main():
+    file_path = 'D:/数字政务/人岗匹配/一句话简历数据/处理数据/线程文件/job9134'
     files = get_excel_files(file_path)
     file_groups = [files[i:i + 2] for i in range(0, len(files), 2)]
     threads = []
@@ -443,38 +620,47 @@ def update_resume_main():
     for  thread in threads:
         thread.join()
 
-def update_resume_main_sc():
+def get_excel_files(folder_path):
+    excel_files = []
+    for root, dirs, files in os.walk(folder_path):
+        for file in files:
+            if file.endswith(".xlsx") or file.endswith(".xls"):
+                excel_files.append(os.path.join(root, file))
+    return excel_files
+
+def thread_task(files):
+    for file in files:
+        process_excel_file(file)
+
+def process_excel_file(file_path):
     connection = get_db_connection()
     cursor = connection.cursor()
-    fiile_path = 'D:/数字政务/人岗匹配/一句话简历数据/处理数据/人岗匹配_sc_0_13000_20250609092438.xlsx'
-    df = pd.read_excel(fiile_path)
-    for index, row in df.iterrows():
-        input = row['input']
-        modelAnswer = row['modelAnswer']
-        start_marker = "```json\n"
-        end_marker = "```"
-        json_start = input.find(start_marker) + len(start_marker)
-        json_end = input.find(end_marker, json_start)
-        if json_start == -1 or json_end == -1:
-            print(f"第{index + 1}条数据没有找到json数据")
-            continue
+    try:
+        df = pd.read_excel(file_path)
+        # 假设有一个'id'字段用于匹配和更新
+        for index, row in df.iterrows():
+            # 这里可以根据你的需求进行数据库更新或其他操作
+            cursor.execute("update zhilian_job set job_description_detail = %s, process_start_time = %s,"
+                           "process_end_time = %s,time_consume = %s, process_type = %s where id = %s",
+                           (row['introduce'], row['startTime_format'], row['endTime_format'], row['耗时(秒)'], '1', row['id']))
+            connection.commit()
+            print(f"更新数据成功, id: {row['id']}")
+    except Exception as e:
+        print(f"Error processing file {file_path}: {e}")
+    finally:
+        close_db_connection(cursor, connection)
 
-        json_data = json.loads(input[json_start:json_end].strip())
-        id = json_data['id']
-        cursor.execute("update sc_pub_recruitmentnet_resume set resume_description_detail = %s where id = %s",
-                       (modelAnswer, id))
-        connection.commit()
-        print(f"更新数据成功, id: {id}")
-
-# 调用主函数
 if __name__ == "__main__":
-    # output_dir = 'D:/数字政务/人岗匹配/一句话简历数据/处理数据/线程文件/end4000'  # 输出目录
-    # main(output_dir)
-    # update_resume_main()
-    update_resume_main_sc()
+    # clean_job_data()
+    process_jobs()
+    # process_sc_jobs()
+    # process_job_excel()
+    # output_dir = 'D:/数字政务/人岗匹配/一句话简历数据/处理数据/线程文件/job9134'  # 输出目录
+    # job_main(output_dir)
 
-    # num_threads = 10
+    # update_job_main()
+
+    # num_threads = 20
     # batch_size = 10
-    # # start_processing_with_threads(num_threads=num_threads, batch_size=batch_size)
     # max_retries = 5
     # start_with_restarting_pool(num_threads=num_threads,max_retries=5, batch_size=batch_size)

@@ -5,7 +5,7 @@ import os
 # 添加当前目录到Python路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from job_compare import compare_json_with_text
+from company.job.job_compare import compare_json_with_text
 
 def test_welfare_matching():
     """测试福利待遇匹配功能"""
